@@ -5,9 +5,8 @@
  *      Author: fef0
  */
 
-// Must fit in a uint8_t
-#define MAXTASKS 255
-#define STACKSIZE 128
+#define MAXTASKS 10
+#define STACKSIZE 256
 
 // A stack will contain the register starting from the 128-16 = 112th position in this order:
 // {r12-r0}, LR, PC, xPSR
@@ -35,7 +34,7 @@ typedef struct tcbList tcbListType;
 void initList();
 uint8_t isListEmpty();
 uint32_t* createStack();
-void addTask(void (*taskFunc)(), uint8_t taskID);
+int addTask(void (*taskFunc)(), uint8_t taskID);
 void task0();
 void startScheduler();
 
