@@ -27,14 +27,13 @@
 // Used to start the first task
 // Since this function is an interrupt, {R0-R3, LR, PC, xPSR} have already been pushed to stack
 SVC_Handler:
-
 	// Disable interrupts
     cpsid i
     // Load currentTask pointer (R0 = &currentTask)
     ldr R0, =currentTask
 
     // Dereference &currentTask (R0 = *(&currentTask) = currentTask) which is
-    // a pointer to the task tcb
+    // a pointer to the task tcb (&tcb)
     ldr R0, [R0]
 
     // Dereference &tcb to get tcb->stackPt
@@ -72,13 +71,10 @@ SysTick_Handler:
 
 	// Load current task pointer (R1 = &currentTask)
 	ldr R1, =currentTask
+
 	// Dereference (R1 = *(&currentTask) = currentTask = &tcb) which is
 	// a pointer to the tcb
 	ldr R2, [R1]
-
-	// Dereference again to get tcb (R2 = *(&tcb) = tcb) but since it is a struct
-	// and its first element is stackPt, then R2 = tcb = tcb->stackPt
-	ldr R2, [R2]
 
 	// Check if the current context is a Floating Point Context
 	// (see cortex m4 manual)
@@ -89,27 +85,29 @@ SysTick_Handler:
 	//vstmdbeq  R0!, {S16-S31}
 
 	// Push normal context registers into currentTask stack
+	// (after the hardware stack frame {R0-R3, R12, LR, PC, xPSR}
 	stmfd R0!, {R4-R11, LR}
 
-	// Save the new stack pointer inside currentTask stack
-	// in order to be used for the next task run
+	// Save the new stack pointer inside currentTask pointer
 	str R0, [R2]
 
-	ldr r2, [r1]
 
-	// ---- Load next task ----
+	// ----------------------- LOAD NEXT TASK -------------------------------
+	// Dereference again (*(&currentTask) = currentTask)
+	ldr R2, [R1]
+
 	// Load next task pointer starting from currentTask
 	// (R3 = (&tcb->next)) which is a pointer to another tcb
 	// (since it's a uint32_t then the "next" element is 4 bytes after "stackPt")
 	ldr R3, [R2, #4]
 
+	// Make currentTask point to tcb->next
+	// (currentTask = tcb->next)
+	str R3, [R1]
+
 	// Dereference to get tcb->next (R3 = *(&(tcb->next)) = tcb->next) which is equal to
 	// tcb->next->stackPt and load it into R0 (R0 = tcb->next->stackPt)
 	ldr R0, [R3]
-
-	// Make currentTask point to currentTask->next = tcb->next
-	// currentTask = tcb->next
-	str R3, [R1]
 
 	// Pop R4-R11 and LR from the next task stack
 	ldmfd R0!, {R4-R11, LR}
@@ -125,6 +123,9 @@ SysTick_Handler:
 	// PSP will now point to the next task stack
 	msr PSP, R0
 
+	// Enable interrupts
 	cpsie I
+
+	bx LR
 
 
