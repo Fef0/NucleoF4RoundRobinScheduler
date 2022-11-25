@@ -9,30 +9,35 @@
 #include <stdlib.h>
 #include "scheduler.h"
 #include "stm32f4xx.h"
+#include "stm32f4xx_hal_conf.h"
 
-#define BUS_FREQ   16000000
+
+#define BUS_FREQ 84000000
 #define MILLIS_PRESCALER BUS_FREQ/1000
 
-// It's a linked list of Task Control Blocks
-tcbListType* tasksList;
+// It's a linked queue of Task Control Blocks
+tcbQueueType* tasksQueue;
 
 // Points to the current task
 tcbNode* currentTask;
+
+// Boolean flag that signals the scheduler if idleTask is running or not
+uint8_t isIdleTaskRunning = 0;
 
 void taskReturn() {
 	while(1);
 }
 
-void initList() {
-	// Dynamically allocate space for tasksList and init it
-	tasksList = (tcbListType*) malloc(sizeof(tcbListType));
-	tasksList->head = NULL;
-	tasksList->tail = NULL;
-	tasksList->tasksNum = 0;
+void initQueue() {
+	// Dynamically allocate space for tasksQueue and init it
+	tasksQueue = (tcbQueueType*) malloc(sizeof(tcbQueueType));
+	tasksQueue->head = NULL;
+	tasksQueue->tail = NULL;
+	tasksQueue->tasksNum = 0;
 }
 
-uint8_t isListEmpty() {
-	return tasksList->tasksNum == 0;
+uint8_t isQueueEmpty() {
+	return tasksQueue->tasksNum == 0;
 }
 
 void initStack(uint32_t* stackPt, void (*taskFunc)()) {
@@ -81,45 +86,46 @@ uint32_t* createStack(void (*taskFunc)()) {
 	return &(stackPt[STACKSIZE-17]);
 }
 
-tcbNode* t1;
-tcbNode* t2;
 
-// Add a new task to the tasks list
-int addTask(void (*taskFunc)(), uint8_t taskID) {
+// Add a new task to the tasks queue
+void addTask(void (*taskFunc)()) {
+	// If the idleTask is running then we must remove it to add the first real task
+	if (isIdleTaskRunning) {
+		// Deallocate idleTask memory
+		free(tasksQueue->head);
+		// Reset queue tasks num to "empty" the queue
+		tasksQueue->tasksNum = 0;
+		// Reset isIsleTaskRunning
+		isIdleTaskRunning = 0;
+	}
+
 	// Allocate space for a new Thread Control Block
 	tcbNode* t = (tcbNode*) malloc(sizeof(tcbNode));
 	// Create the stack
 	t->stackPt = createStack(taskFunc);
-	// Set taskID
-	t->taskID++;
-
-	// If the list is empty then initialize head and tail at the same position
+	t->taskID = tasksQueue->tasksNum;
+	// If the queue is empty then initialize head and tail at the same position
 	// Otherwise update the last element to point to the new one and update the tail
-	if (isListEmpty()) {
-		tasksList->head = tasksList->tail = t;
+	if (isQueueEmpty()) {
+		tasksQueue->head = tasksQueue->tail = t;
 		// Update currentTask pointer to point to the first
 		// task added
 		currentTask = t;
-		t1 = t;
 	} else {
-		tasksList->tail->next = t;
-		tasksList->tail = t;
-		t2 = t;
+		tasksQueue->tail->next = t;
+		tasksQueue->tail = t;
 	}
 
-	// The last element will now point to the head of the circular list
-	tasksList->tail->next = tasksList->head;
+	// The last element will now point to the head of the circular queue
+	tasksQueue->tail->next = tasksQueue->head;
 	// Update tasks number
-	tasksList->tasksNum++;
-
-	// Return taskID
-	return t->taskID;
+	tasksQueue->tasksNum++;
 }
 
 /*
 // TODO: complete this
 uint8_t removeTask(uint8_t taskID) {
-	tcbNode* iter = tasksList->head;
+	tcbNode* iter = tasksQueue->head;
 	tcbNode* prev = NULL;
 	while(1) {
 		if (iter == NULL) {
@@ -128,7 +134,7 @@ uint8_t removeTask(uint8_t taskID) {
 
 		if (iter->taskID == taskID) {
 			// Case 1: the element to remove is the head
-			if (iter == tasksList->head) {
+			if (iter == tasksQueue->head) {
 
 			}
 			// TODO don't forget to free the pointer
@@ -142,40 +148,53 @@ uint8_t removeTask(uint8_t taskID) {
 
 int c1 = 0;
 int c2 = 0;
+uint32_t freq = 0;
+uint32_t time = 50;
 
-void task0() {
-	while(1) {
-		c1++;
-	}
+// This task is loaded automatically at startup and is used
+// in case no other task exists in the system
+void idleTask() {
+	while(1);
 }
 
-void task1() {
-	while(1) {
-		c2++;
-	}
-}
-
-void startScheduler() {
-	// Initialize the circular linked list
-	initList();
-
-	// Add the first task
-	addTask(&task0, 1);
-
-	// Add the first second
-	addTask(&task1, 2);
-
+void sysTickInit(uint32_t quanta_ms) {
 	// Config systick
 	SysTick->CTRL =0;   //Disable the SysTick timer; Offset: 0x000 (R/W)  SysTick Control and Status Register
 	SysTick->VAL=0;     //Clear current value to 0; Offset: 0x008 (R/W)  SysTick Current Value Register
-	SysTick->LOAD = (0.01 * MILLIS_PRESCALER)-1;   //Offset: 0x004 (R/W)  SysTick Reload Value Register
+	SysTick->LOAD = (quanta_ms * MILLIS_PRESCALER)-1;   //Offset: 0x004 (R/W)  SysTick Reload Value Register
 	// Enable systick
 	SysTick->CTRL =0x00000007;
+}
+
+void startScheduler(uint32_t quanta_ms) {
+	// Initialize the circular linked queue
+	initQueue();
+
+	// Always add the idle Task as the first task
+	addTask(&idleTask);
+	isIdleTaskRunning = 1;
+
+	// TODO delete-me
+	GPIO_InitTypeDef BoardLEDsB;
+	BoardLEDsB.Mode = GPIO_MODE_OUTPUT_PP;
+	BoardLEDsB.Pin = GPIO_PIN_0;
+	HAL_GPIO_Init(GPIOB, &BoardLEDsB);
+
+	GPIO_InitTypeDef BoardLEDsC;
+	BoardLEDsC.Mode = GPIO_MODE_OUTPUT_PP;
+	BoardLEDsC.Pin = GPIO_PIN_2|GPIO_PIN_3;
+	HAL_GPIO_Init(GPIOC, &BoardLEDsC);
+
+	sysTickInit(quanta_ms);
+	freq = HAL_RCC_GetSysClockFreq();
+
+	TIM_init(TIM2);
+	// Configure the timebase
+	TIM_config_timebase(TIM2, 1, 1000);
+	TIM_on(TIM2); // starts the timer
+	TIM2->CNT = 0; // resets the counter
 
 	// Call SVC_Handler and load the first task
 	__asm("svc 0");
-
-	// It shouldn't ever get here
-	while(1);
 }
 

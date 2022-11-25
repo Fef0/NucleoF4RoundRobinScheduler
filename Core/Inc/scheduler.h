@@ -23,18 +23,22 @@ struct tcb {
 typedef struct tcb tcbNode;
 
 
-// It's a circular linked list
-struct tcbList {
+// It's a circular queue
+struct tcbQueue {
 	tcbNode* head;
 	tcbNode* tail;
 	uint8_t tasksNum;
 };
-typedef struct tcbList tcbListType;
+typedef struct tcbQueue tcbQueueType;
 
 void initList();
 uint8_t isListEmpty();
+
 uint32_t* createStack();
-int addTask(void (*taskFunc)(), uint8_t taskID);
+void addTask(void (*taskFunc)());
+void idleTask();
+void clockInit(uint32_t quanta);
 void task0();
+void task1();
 void startScheduler();
 
