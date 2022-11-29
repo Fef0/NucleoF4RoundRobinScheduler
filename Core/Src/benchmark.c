@@ -40,29 +40,38 @@ void TIM_on(TIM_TypeDef* tim) {
 	tim->SR = 0;
 }
 
-uint32_t runtime = 0;
+uint32_t clock_cycle_s = 0;
 
-void task0() {
-	runtime = TIM2->CNT;
+void task_test0() {
+	clock_cycle_s = TIM2->CNT;
 	while(1);
 }
 
-void task1() {
-	runtime = TIM2->CNT;
+void task_test1() {
+	clock_cycle_s = TIM2->CNT;
 	while(1);
 }
 
-int main2(void)
+int benchmark(void)
 {
-  /*
-   * System init functions, omitted for space saving
-   */
-  addTask(&task0);
+	/*
+	* System init functions, omitted for space saving
+	* ...
+	*/
 
-  addTask(&task1);
+	addTask(&task_test0);
 
-  // Start scheduler with 1ms time quanta
-  startScheduler(1);
+	addTask(&task_test1);
 
-  return 0;
+	// Init TIM2 32-bit timer
+	TIM_init(TIM2);
+	// Configure the timebase
+	TIM_config_timebase(TIM2, 1, 1000);
+	TIM_on(TIM2); // starts the timer
+	TIM2->CNT = 0; // resets the counter
+
+	// Start scheduler with 1ms time quanta
+	startScheduler(1);
+
+	return 0;
 }
