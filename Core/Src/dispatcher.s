@@ -25,7 +25,7 @@
 
 
 // Used to start the first task
-// Since this function is an interrupt, {R0-R3, LR, PC, xPSR} have already been pushed to stack
+// Since this function is an interrupt handler, {R0-R3, R12, LR, PC, xPSR} have already been pushed to stack
 SVC_Handler:
 	// Disable interrupts
     cpsid i
@@ -58,7 +58,7 @@ SVC_Handler:
 
 
 // Used to handle the context switch from one task to another
-// Since this function is an interrupt, {R0-R3, LR, PC, xPSR} have already been pushed to stack
+// Since this function is an interrupt handler, {R0-R3, R12, LR, PC, xPSR} have already been pushed to stack
 SysTick_Handler:
 	// REMEMBER: every edit done before switching task
 	// is done on currentTask stack
@@ -76,16 +76,8 @@ SysTick_Handler:
 	// a pointer to the tcb
 	ldr R2, [R1]
 
-	// Check if the current context is a Floating Point Context
-	// (see cortex m4 manual)
-	//tst LR, #0x00000010
-	// if equal then
-	//it eq
-	// If equal, then push FPU registers into currentTask stack
-	//vstmdbeq  R0!, {S16-S31}
-
 	// Push normal context registers into currentTask stack
-	// (after the hardware stack frame {R0-R3, R12, LR, PC, xPSR}
+	// (after the hardware stack frame {R0-R3, R12, LR, PC, xPSR})
 	stmfd R0!, {R4-R11, LR}
 
 	// Save the new stack pointer inside currentTask pointer
@@ -111,14 +103,6 @@ SysTick_Handler:
 
 	// Pop R4-R11 and LR from the next task stack
 	ldmfd R0!, {R4-R11, LR}
-
-	// Check if the current context is a Floating Point Context
-	// (see cortex m4 manual)
-	//tst LR, #0x00000010
-	// if equal then
-	//it eq
-	// If equal, then push FPU registers into currentTask stack
-	//vldmiaeq  R0!, {S16-S31}
 
 	// PSP will now point to the next task stack
 	msr PSP, R0
