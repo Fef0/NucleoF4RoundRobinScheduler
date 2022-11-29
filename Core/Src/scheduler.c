@@ -11,18 +11,11 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal_conf.h"
 
-
-#define BUS_FREQ 84000000
-#define MILLIS_PRESCALER BUS_FREQ/1000
-
 // It's a linked queue of Task Control Blocks
 tcbQueueType* tasksQueue;
 
 // Points to the current task
 tcbNode* currentTask;
-
-// Boolean flag that signals the scheduler if idleTask is running or not
-uint8_t isIdleTaskRunning = 0;
 
 void taskReturn() {
 	while(1);
@@ -71,9 +64,6 @@ void initStack(uint32_t* stackPt, void (*taskFunc)()) {
 	}
 }
 
-
-// The stack will contain {R0-R12}, LR, PC, xPSR and eventually the Floating Point registers {s0-s31}
-// (not in this order)
 uint32_t* createStack(void (*taskFunc)()) {
 	// Dynamically create the new stack and update the pointer
 	uint32_t* stackPt = (uint32_t*) malloc(sizeof(stack));
@@ -89,17 +79,7 @@ uint32_t* createStack(void (*taskFunc)()) {
 
 // Add a new task to the tasks queue
 void addTask(void (*taskFunc)()) {
-	// If the idleTask is running then we must remove it to add the first real task
-	if (isIdleTaskRunning) {
-		// Deallocate idleTask memory
-		free(tasksQueue->head);
-		// Reset queue tasks num to "empty" the queue
-		tasksQueue->tasksNum = 0;
-		// Reset isIsleTaskRunning
-		isIdleTaskRunning = 0;
-	}
-
-	// Allocate space for a new Thread Control Block
+	// Allocate space for a new Task Control Block
 	tcbNode* t = (tcbNode*) malloc(sizeof(tcbNode));
 	// Create the stack
 	t->stackPt = createStack(taskFunc);
@@ -122,78 +102,27 @@ void addTask(void (*taskFunc)()) {
 	tasksQueue->tasksNum++;
 }
 
-/*
-// TODO: complete this
-uint8_t removeTask(uint8_t taskID) {
-	tcbNode* iter = tasksQueue->head;
-	tcbNode* prev = NULL;
-	while(1) {
-		if (iter == NULL) {
-			return 0;
-		}
-
-		if (iter->taskID == taskID) {
-			// Case 1: the element to remove is the head
-			if (iter == tasksQueue->head) {
-
-			}
-			// TODO don't forget to free the pointer
-			return 1;
-		}
-
-		iter = iter->next;
-	}
-}
-*/
-
-int c1 = 0;
-int c2 = 0;
-uint32_t freq = 0;
-uint32_t time = 50;
-
-// This task is loaded automatically at startup and is used
-// in case no other task exists in the system
-void idleTask() {
-	while(1);
-}
-
-void sysTickInit(uint32_t quanta_ms) {
-	// Config systick
-	SysTick->CTRL =0;   //Disable the SysTick timer; Offset: 0x000 (R/W)  SysTick Control and Status Register
-	SysTick->VAL=0;     //Clear current value to 0; Offset: 0x008 (R/W)  SysTick Current Value Register
-	SysTick->LOAD = (quanta_ms * MILLIS_PRESCALER)-1;   //Offset: 0x004 (R/W)  SysTick Reload Value Register
-	// Enable systick
+// Config SysTick
+void sysTickInit(uint32_t quanta_us) {
+	// Disable the SysTick timer
+	SysTick->CTRL = 0;
+	//Clear current value to 0
+	SysTick->VAL = 0;
+	// Load SysTick to generate an interrupt after a quanta
+	SysTick->LOAD = (quanta_us * MICRO_PRESCALER)-1;
+	// Enable SysTick
 	SysTick->CTRL =0x00000007;
 }
 
-void startScheduler(uint32_t quanta_ms) {
+void initScheduler(uint32_t quanta_us) {
 	// Initialize the circular linked queue
 	initQueue();
 
-	// Always add the idle Task as the first task
-	addTask(&idleTask);
-	isIdleTaskRunning = 1;
+	// Initialize the system clock
+	sysTickInit(quanta_us);
+}
 
-	// TODO delete-me
-	GPIO_InitTypeDef BoardLEDsB;
-	BoardLEDsB.Mode = GPIO_MODE_OUTPUT_PP;
-	BoardLEDsB.Pin = GPIO_PIN_0;
-	HAL_GPIO_Init(GPIOB, &BoardLEDsB);
-
-	GPIO_InitTypeDef BoardLEDsC;
-	BoardLEDsC.Mode = GPIO_MODE_OUTPUT_PP;
-	BoardLEDsC.Pin = GPIO_PIN_2|GPIO_PIN_3;
-	HAL_GPIO_Init(GPIOC, &BoardLEDsC);
-
-	sysTickInit(quanta_ms);
-	freq = HAL_RCC_GetSysClockFreq();
-
-	TIM_init(TIM2);
-	// Configure the timebase
-	TIM_config_timebase(TIM2, 1, 1000);
-	TIM_on(TIM2); // starts the timer
-	TIM2->CNT = 0; // resets the counter
-
+void startScheduler() {
 	// Call SVC_Handler and load the first task
 	__asm("svc 0");
 }

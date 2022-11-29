@@ -63,7 +63,7 @@ static void MX_GPIO_Init(void);
   * @retval int
   */
 
-void task00() {
+void blinkRed() {
 	while(1) {
 		HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0);
 		//sleep
@@ -71,7 +71,7 @@ void task00() {
 	}
 }
 
-void task10() {
+void blinkYellow() {
 	while(1) {
 		HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_2);
 		//sleep
@@ -79,23 +79,41 @@ void task10() {
 	}
 }
 
+uint32_t clock_cycles = 0;
+
 int main(void)
 {
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
 
-  addTask(&task00);
 
-  addTask(&task10);
+	clock_cycles = 68;
+	// Init LEDs pins
+	GPIO_InitTypeDef BoardLEDsB;
+	BoardLEDsB.Mode = GPIO_MODE_OUTPUT_PP;
+	BoardLEDsB.Pin = GPIO_PIN_0;
+	HAL_GPIO_Init(GPIOB, &BoardLEDsB);
 
-  // Start scheduler with 1ms time quanta
-  startScheduler(1);
+	GPIO_InitTypeDef BoardLEDsC;
+	BoardLEDsC.Mode = GPIO_MODE_OUTPUT_PP;
+	BoardLEDsC.Pin = GPIO_PIN_2|GPIO_PIN_3;
+	HAL_GPIO_Init(GPIOC, &BoardLEDsC);
+
+	// Init scheduler with 1ms = 1000us time quanta
+	initScheduler(1000);
+
+	addTask(&blinkRed);
+
+	addTask(&blinkYellow);
+
+	// Start scheduler
+	startScheduler();
 }
 
 /**
