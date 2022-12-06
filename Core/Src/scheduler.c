@@ -102,6 +102,16 @@ void addTask(void (*taskFunc)()) {
 	tasksQueue->tasksNum++;
 }
 
+
+void forceTaskSwitch() {
+	// Force a context switch through PendSV interrupt
+	SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+}
+
+void taskYield() {
+	forceTaskSwitch();
+}
+
 // Config SysTick
 void sysTickInit(uint32_t quanta_us) {
 	// Disable the SysTick timer
@@ -113,6 +123,11 @@ void sysTickInit(uint32_t quanta_us) {
 	// Enable SysTick
 	SysTick->CTRL =0x00000007;
 }
+
+void SysTick_Handler() {
+	forceTaskSwitch();
+}
+
 
 void initScheduler(uint32_t quanta_us) {
 	// Initialize the circular linked queue

@@ -79,8 +79,6 @@ void blinkYellow() {
 	}
 }
 
-uint32_t clock_cycles = 0;
-
 int main(void)
 {
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
@@ -92,8 +90,6 @@ int main(void)
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 
-
-	clock_cycles = 68;
 	// Init LEDs pins
 	GPIO_InitTypeDef BoardLEDsB;
 	BoardLEDsB.Mode = GPIO_MODE_OUTPUT_PP;

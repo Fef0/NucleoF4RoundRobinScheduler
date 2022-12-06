@@ -34,10 +34,12 @@ uint8_t isListEmpty();
 
 uint32_t* createStack();
 void addTask(void (*taskFunc)());
-void idleTask();
+void taskYield();
 void sysTickInit(uint32_t quanta_us);
 void task0();
 void task1();
 void initScheduler(uint32_t quanta_us);
+void forceTaskSwitch();
+void SysTick_Handler();
 void startScheduler();
 

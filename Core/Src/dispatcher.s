@@ -14,11 +14,11 @@
 
 // Function def
 .type SVC_Handler, %function
-.type SysTick_Handler, %function
+.type PendSV_Handler, %function
 
 // Function export
 .global SVC_Handler
-.global SysTick_Handler
+.global PendSV_Handler
 
 // Variable import
 .global currentTask
@@ -56,10 +56,9 @@ SVC_Handler:
     // from the psp in order to branch to the first task
     bx LR
 
-
+PendSV_Handler:
 // Used to handle the context switch from one task to another
 // Since this function is an interrupt handler, {R0-R3, R12, LR, PC, xPSR} have already been pushed to stack
-SysTick_Handler:
 	// REMEMBER: every edit done before switching task
 	// is done on currentTask stack
 
