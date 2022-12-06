@@ -63,9 +63,12 @@ static void MX_GPIO_Init(void);
   * @retval int
   */
 
-void blinkRed() {
+void blinkRedAndYield() {
 	while(1) {
 		HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0);
+		// After this call PendSV_Handler gets called
+		// and the task is switched (for debugging purpose only)
+		taskYield();
 		//sleep
 		for (int i=0; i<4000000;i++);
 	}
@@ -104,7 +107,7 @@ int main(void)
 	// Init scheduler with 1ms = 1000us time quanta
 	initScheduler(1000);
 
-	addTask(&blinkRed);
+	addTask(&blinkRedAndYield);
 
 	addTask(&blinkYellow);
 
